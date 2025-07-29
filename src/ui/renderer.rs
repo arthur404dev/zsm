@@ -241,9 +241,9 @@ impl PluginRenderer {
     /// Render help text
     fn render_help_text(state: &PluginState, x: usize, y: usize, theme: &Option<Theme>) {
         let help_text = if state.display_items().is_empty() {
-            "Type session name and press Enter • Ctrl+Enter: Quick create • Esc: Exit"
+            "Type session name and press Enter • Esc: Exit"
         } else {
-            "↑/↓: Navigate • Enter: Switch/New • Ctrl+Enter: Quick create • Delete: Kill • Type: Search • Esc: Exit"
+            "↑/↓: Navigate • Enter: Switch/Create • Delete: Kill • Type: Search • Esc: Exit"
         };
         
         let text = if let Some(theme) = theme {

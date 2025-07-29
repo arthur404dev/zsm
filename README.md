@@ -74,7 +74,7 @@ keybinds clear-defaults=true {
                 floating true
                 move_to_focused_tab true
                 
-                // Default layout for Ctrl+Enter quick creation
+                // Default layout for session creation
                 default_layout "development"
             
                 // Session name separator (default: ".")
@@ -89,7 +89,7 @@ keybinds clear-defaults=true {
 
 | Option              | Description                               | Default | Example         |
 |---------------------|-------------------------------------------|---------|-----------------|
-| `default_layout`    | Layout name for Ctrl+Enter quick creation | None    | `"development"` |
+| `default_layout`    | Layout name for session creation         | None    | `"development"` |
 | `session_separator` | Character used in session names           | `"."`   | `"-"` or `"_"`  |
 
 ## 🎯 How It Works
@@ -118,7 +118,7 @@ ZSM automatically generates meaningful session names:
 
 - **Existing sessions** are shown with indicators: `● current` or `○ available`
 - **Both sessions AND directories** are displayed for complete context
-- **Auto-increment**: If session `webapp` exists, creates `webapp.2`, `webapp.3`, etc.
+- **Smart switching**: If a session already exists for a directory, switches to it instead of creating duplicates
 
 ### 4. Quick Workflows
 
@@ -128,13 +128,11 @@ ZSM automatically generates meaningful session names:
 2. Type to search for session
 3. Press `Enter` → Instantly switch
 
-**Create new session**
+**Create new session or switch to existing**
 
 1. Open ZSM  
 2. Navigate to directory
-3. Press `Enter` → Opens session creation (or `Ctrl+Enter` for default)
-4. Choose layout 
-5. Session is created in that directory
+3. Press `Enter` → Creates new session with default layout, or switches to existing session if one already exists for that directory
 
 ## 🔐 Permissions
 

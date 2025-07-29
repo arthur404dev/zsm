@@ -251,10 +251,6 @@ impl PluginState {
                 self.handle_item_selection();
                 true
             }
-            BareKey::Enter if key.has_modifiers(&[KeyModifier::Ctrl]) => {
-                self.handle_quick_session_creation();
-                true
-            }
             BareKey::Delete if key.has_no_modifiers() => {
                 self.handle_delete_key();
                 true
@@ -293,18 +289,6 @@ impl PluginState {
                 // Handle session creation
                 self.new_session_info.handle_selection(&self.current_session_name);
                 self.active_screen = ActiveScreen::Main;
-                true
-            }
-            BareKey::Enter if key.has_modifiers(&[KeyModifier::Ctrl]) => {
-                // Quick session creation with default layout
-                if self.new_session_info.name().len() >= 108 {
-                    self.set_error("Session name must be shorter than 108 bytes".to_string());
-                } else if self.new_session_info.name().contains('/') {
-                    self.set_error("Session name cannot contain '/'".to_string());
-                } else {
-                    self.new_session_info.handle_quick_session_creation(&self.current_session_name, &self.config.default_layout);
-                    self.active_screen = ActiveScreen::Main;
-                }
                 true
             }
             BareKey::Esc if key.has_no_modifiers() => {
@@ -414,15 +398,18 @@ impl PluginState {
                 self.session_manager.execute_action(SessionAction::Switch(name));
                 hide_self();
             } else {
-                // Create new session with incremented name
-                let incremented_name = self.session_manager
-                    .generate_incremented_name(&name, &self.config.session_separator);
-                
-                // Set up new session creation
-                self.new_session_info.set_name(&incremented_name);
-                self.new_session_info.set_folder(Some(std::path::PathBuf::from(&path)));
-                self.new_session_info.advance_to_layout_selection();
-                self.active_screen = ActiveScreen::NewSession;
+                // Check if a session already exists for this directory
+                if let Some(existing_session_name) = self.session_manager
+                    .find_existing_session_for_directory(&name, &self.config.session_separator) {
+                    // Switch to existing session instead of creating a new one
+                    self.session_manager.execute_action(SessionAction::Switch(existing_session_name));
+                    hide_self();
+                } else {
+                    // No existing session found, create new session using quick create logic
+                    self.new_session_info.set_name(&name);
+                    self.new_session_info.set_folder(Some(std::path::PathBuf::from(&path)));
+                    self.new_session_info.handle_quick_session_creation(&self.current_session_name, &self.config.default_layout);
+                }
             }
         }
     }
@@ -500,75 +487,5 @@ impl PluginState {
         self.new_session_info.set_folder(folder);
     }
 
-    /// Handle quick session creation from main screen
-    fn handle_quick_session_creation(&mut self) {
-        use zellij_tile::prelude::{switch_session_with_cwd, switch_session_with_layout};
-        
-        // Get the selected item data or search term
-        let (session_name, session_folder) = if let Some(selected_item) = self.selected_item() {
-            match selected_item {
-                SessionItem::ExistingSession { name, .. } => {
-                    // Switch to existing session
-                    switch_session_with_cwd(Some(&name), None);
-                    hide_self();
-                    return;
-                }
-                SessionItem::Directory { session_name, path, .. } => {
-                    let incremented_name = self.session_manager
-                        .generate_incremented_name(&session_name, &self.config.session_separator);
-                    (incremented_name, Some(std::path::PathBuf::from(path)))
-                }
-            }
-        } else {
-            self.set_error("Please select a directory".to_string());
-            return;
-        };
 
-        // Validate session name
-        if session_name.len() >= 108 {
-            self.set_error("Session name must be shorter than 108 bytes".to_string());
-            return;
-        }
-        if session_name.contains('/') {
-            self.set_error("Session name cannot contain '/'".to_string());
-            return;
-        }
-
-        // Check if session name is different from current session
-        if Some(&session_name) == self.current_session_name.as_ref() {
-            self.set_error("Cannot create session with same name as current session".to_string());
-            return;
-        }
-
-        // Create session with default layout if configured
-        match &self.config.default_layout {
-            Some(layout_name) => {
-                // Find the layout by name from current session's available layouts
-                if let Some(current_session) = self.session_manager.sessions().iter().find(|s| s.is_current_session) {
-                    let layout_info = current_session.available_layouts.iter()
-                        .find(|layout| layout.name() == layout_name)
-                        .cloned();
-                    
-                    match layout_info {
-                        Some(layout) => {
-                            switch_session_with_layout(Some(&session_name), layout, session_folder);
-                        },
-                        None => {
-                            // Defined layout not found, create without layout
-                            switch_session_with_cwd(Some(&session_name), session_folder);
-                        }
-                    }
-                } else {
-                    // No current session info, cannot retrieve layouts, create without layout
-                    switch_session_with_cwd(Some(&session_name), session_folder);
-                }
-            },
-            None => {
-                // No default layout configured, create without layout
-                switch_session_with_cwd(Some(&session_name), session_folder);
-            }
-        }
-
-        hide_self();
-    }
 }

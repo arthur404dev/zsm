@@ -55,6 +55,39 @@ impl SessionManager {
         self.pending_deletion.as_deref()
     }
 
+    /// Check if a session exists for a given directory session name
+    /// Returns the existing session name if found (could be base name or incremented version)
+    pub fn find_existing_session_for_directory(&self, base_name: &str, separator: &str) -> Option<String> {
+        // First check for exact match
+        if self.sessions.iter().any(|s| s.name == base_name) {
+            return Some(base_name.to_string());
+        }
+        
+        // Then check for incremented versions
+        for session in &self.sessions {
+            if self.is_incremented_session(&session.name, base_name, separator) {
+                return Some(session.name.clone());
+            }
+        }
+        
+        None
+    }
+    
+    /// Check if session name is an incremented version of base name
+    fn is_incremented_session(&self, session_name: &str, base_name: &str, separator: &str) -> bool {
+        if session_name.len() <= base_name.len() || !session_name.starts_with(base_name) {
+            return false;
+        }
+        
+        let remainder = &session_name[base_name.len()..];
+        if !remainder.starts_with(separator) {
+            return false;
+        }
+        
+        let number_part = &remainder[separator.len()..];
+        number_part.parse::<u32>().is_ok() && !number_part.is_empty()
+    }
+
     /// Generate incremented session name for a base name
     pub fn generate_incremented_name(&self, base_name: &str, separator: &str) -> String {
         let base_exists = self.sessions.iter().any(|s| s.name == base_name);
