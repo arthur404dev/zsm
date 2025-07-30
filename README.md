@@ -92,6 +92,59 @@ keybinds clear-defaults=true {
 | `default_layout`    | Layout name for session creation         | None    | `"development"` |
 | `session_separator` | Character used in session names           | `"."`   | `"-"` or `"_"`  |
 
+### Keybind Configuration
+
+ZSM supports customizable keybinds. You can override any of the default keybinds by specifying them in your plugin configuration:
+
+```kdl
+plugin location="zsm.wasm" {
+    // Custom keybinds - each action can have multiple keys
+    move_up "Up Ctrl+p k"           // Navigate up: Arrow, Ctrl+P, or K
+    move_down "Down Ctrl+n j"       // Navigate down: Arrow, Ctrl+N, or J
+    select "Enter Space"            // Select item: Enter or Space
+    delete_session "Delete x"       // Delete session: Delete or X
+    exit "Esc q Ctrl+c"            // Exit plugin: Esc, Q, or Ctrl+C
+}
+```
+
+#### Available Actions
+
+| Action | Description | Default Keys |
+|--------|-------------|--------------|
+| `move_up` | Navigate up in list | `Up`, `Ctrl+P` |
+| `move_down` | Navigate down in list | `Down`, `Ctrl+N` |
+| `select` | Select item (switch/create session) | `Enter` |
+| `delete_session` | Delete selected session | `Delete` |
+| `exit` | Exit plugin | `Esc`, `Ctrl+C` |
+| `clear_search` | Clear search input | `Esc` |
+| `confirm` | Confirm action (new session screen) | `Enter` |
+| `cancel` | Cancel/go back | `Esc` |
+| `launch_filepicker` | Open filepicker | `Ctrl+F` |
+| `clear_folder` | Clear session folder | `Ctrl+C` |
+| `correct_name` | Go back to name entry | `Ctrl+R` |
+
+#### Key Format
+
+Keys can be specified in the following formats:
+- **Simple keys**: `Enter`, `Esc`, `Space`, `Delete`, `Up`, `Down`, `Left`, `Right`
+- **Character keys**: `a`, `b`, `c`, etc. (case insensitive)
+- **Function keys**: `F1`, `F2`, ..., `F12`
+- **Modified keys**: `Ctrl+p`, `Alt+a`, `Shift+f1`
+- **Multiple keys**: `"Up Ctrl+p k"` (space-separated)
+
+#### Vim-Style Navigation
+
+By default, ZSM includes vim-style navigation with `Ctrl+N` (down) and `Ctrl+P` (up). You can customize this further:
+
+```kdl
+plugin location="zsm.wasm" {
+    move_up "Up k Ctrl+p"
+    move_down "Down j Ctrl+n"
+    select "Enter l"
+    exit "Esc q"
+}
+```
+
 ## 🎯 How It Works
 
 ### 1. Directory Display

@@ -1,5 +1,6 @@
 use zellij_tile::prelude::{print_text_with_coordinates, print_table_with_coordinates, Table, Text, Palette};
 
+use crate::keybinds::KeyAction;
 use crate::session::SessionItem;
 use crate::state::{PluginState, ActiveScreen};
 use crate::ui::{Colors, Theme};
@@ -241,18 +242,49 @@ impl PluginRenderer {
     /// Render help text
     fn render_help_text(state: &PluginState, x: usize, y: usize, theme: &Option<Theme>) {
         let help_text = if state.display_items().is_empty() {
-            "Type session name and press Enter • Esc: Exit"
+            Self::generate_empty_help_text(state)
         } else {
-            "↑/↓: Navigate • Enter: Switch/Create • Delete: Kill • Type: Search • Esc: Exit"
+            Self::generate_main_help_text(state)
         };
         
         let text = if let Some(theme) = theme {
-            theme.content(help_text).color_range(1, ..)
+            theme.content(&help_text).color_range(1, ..)
         } else {
-            Text::new(help_text).color_range(1, ..)
+            Text::new(&help_text).color_range(1, ..)
         };
         
         print_text_with_coordinates(text, x, y, None, None);
+    }
+    
+    /// Generate help text for when no items are displayed
+    fn generate_empty_help_text(state: &PluginState) -> String {
+        let select_keys = state.config().keybinds.format_keys_for_action(KeyAction::Select);
+        let exit_keys = state.config().keybinds.format_keys_for_action(KeyAction::Exit);
+        
+        format!("Type session name and press {} • {}: Exit", select_keys, exit_keys)
+    }
+    
+    /// Generate help text for main screen with items
+    fn generate_main_help_text(state: &PluginState) -> String {
+        let keybinds = &state.config().keybinds;
+        
+        let nav_up = keybinds.format_keys_for_action(KeyAction::MoveUp);
+        let nav_down = keybinds.format_keys_for_action(KeyAction::MoveDown);
+        let select = keybinds.format_keys_for_action(KeyAction::Select);
+        let delete = keybinds.format_keys_for_action(KeyAction::DeleteSession);
+        let exit = keybinds.format_keys_for_action(KeyAction::Exit);
+        
+        // Combine up/down navigation if they're different
+        let navigation = if nav_up == nav_down {
+            nav_up
+        } else {
+            format!("{}/{}", nav_up, nav_down)
+        };
+        
+        format!(
+            "{}: Navigate • {}: Switch/Create • {}: Kill • Type: Search • {}: Exit",
+            navigation, select, delete, exit
+        )
     }
 
     /// Render error message

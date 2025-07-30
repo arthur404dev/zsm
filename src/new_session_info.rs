@@ -2,6 +2,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use std::path::PathBuf;
 use zellij_tile::prelude::*;
+use crate::keybinds::{KeybindManager, KeyAction};
 
 #[derive(Default)]
 pub struct NewSessionInfo {
@@ -93,49 +94,54 @@ impl NewSessionInfo {
             },
         }
     }
-    pub fn handle_key(&mut self, key: KeyWithModifier) {
-        match key.bare_key {
-            BareKey::Backspace if key.has_no_modifiers() => {
-                self.handle_backspace();
-            },
-            BareKey::Char('c') if key.has_modifiers(&[KeyModifier::Ctrl]) => {
-                self.handle_break();
-            },
-            BareKey::Char('r') if key.has_modifiers(&[KeyModifier::Ctrl]) => {
-                // Ctrl+R to correct session name - only when in layout search mode
-                if self.entering_new_session_info == EnteringState::EnteringLayoutSearch {
-                    self.correct_session_name();
+    pub fn handle_key(&mut self, key: KeyWithModifier, keybinds: &KeybindManager) {
+        // Look up the action for this key
+        if let Some(action) = keybinds.get_action(&key) {
+            match action {
+                KeyAction::Backspace => {
+                    self.handle_backspace();
                 }
-            },
-            BareKey::Esc if key.has_no_modifiers() => {
-                // Esc goes back to previous state or clears current input
-                match self.entering_new_session_info {
-                    EnteringState::EnteringLayoutSearch => {
-                        // In layout search, if there's a search term, clear it; otherwise go back to name entry
-                        if !self.layout_list.layout_search_term.is_empty() {
-                            self.layout_list.layout_search_term.clear();
-                            self.update_layout_search_term();
-                        } else {
-                            // No search term, go back to name entry
-                            self.entering_new_session_info = EnteringState::EnteringName;
-                        }
-                    },
-                    EnteringState::EnteringName => {
-                        // In name entry, clear the name
-                        self.name.clear();
-                    },
+                KeyAction::ClearFolder => {
+                    self.handle_break();
                 }
-            },
-            BareKey::Char(character) if key.has_no_modifiers() => {
-                self.add_char(character);
-            },
-            BareKey::Up if key.has_no_modifiers() => {
-                self.move_selection_up();
-            },
-            BareKey::Down if key.has_no_modifiers() => {
-                self.move_selection_down();
-            },
-            _ => {},
+                KeyAction::CorrectName => {
+                    // Ctrl+R to correct session name - only when in layout search mode
+                    if self.entering_new_session_info == EnteringState::EnteringLayoutSearch {
+                        self.correct_session_name();
+                    }
+                }
+                KeyAction::Cancel => {
+                    // Esc goes back to previous state or clears current input
+                    match self.entering_new_session_info {
+                        EnteringState::EnteringLayoutSearch => {
+                            // In layout search, if there's a search term, clear it; otherwise go back to name entry
+                            if !self.layout_list.layout_search_term.is_empty() {
+                                self.layout_list.layout_search_term.clear();
+                                self.update_layout_search_term();
+                            } else {
+                                // No search term, go back to name entry
+                                self.entering_new_session_info = EnteringState::EnteringName;
+                            }
+                        },
+                        EnteringState::EnteringName => {
+                            // In name entry, clear the name
+                            self.name.clear();
+                        },
+                    }
+                }
+                KeyAction::CharacterInput(character) => {
+                    self.add_char(character);
+                }
+                KeyAction::MoveUp => {
+                    self.move_selection_up();
+                }
+                KeyAction::MoveDown => {
+                    self.move_selection_down();
+                }
+                _ => {
+                    // Other actions are not handled in NewSessionInfo
+                }
+            }
         }
     }
     

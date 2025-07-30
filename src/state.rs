@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use zellij_tile::prelude::*;
 
 use crate::config::Config;
+use crate::keybinds::KeyAction;
 use crate::session::{SessionManager, SessionItem, SessionAction};
 use crate::zoxide::{ZoxideDirectory, SearchEngine};
 use crate::new_session_info::NewSessionInfo;
@@ -115,6 +116,11 @@ impl PluginState {
     pub fn active_screen(&self) -> ActiveScreen {
         self.active_screen
     }
+    
+    /// Get the plugin configuration
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
 
     /// Get items to display (combined sessions and zoxide directories)
     pub fn display_items(&self) -> Vec<SessionItem> {
@@ -220,10 +226,7 @@ impl PluginState {
         self.error.as_deref()
     }
 
-    /// Get current configuration
-    pub fn config(&self) -> &Config {
-        &self.config
-    }
+
 
     /// Get selected item
     pub fn selected_item(&self) -> Option<SessionItem> {
@@ -238,95 +241,108 @@ impl PluginState {
 
     /// Handle main screen key input
     fn handle_main_screen_key(&mut self, key: KeyWithModifier) -> bool {
-        match key.bare_key {
-            BareKey::Up if key.has_no_modifiers() => {
-                self.move_selection_up();
-                true
-            }
-            BareKey::Down if key.has_no_modifiers() => {
-                self.move_selection_down();
-                true
-            }
-            BareKey::Enter if key.has_no_modifiers() => {
-                self.handle_item_selection();
-                true
-            }
-            BareKey::Delete if key.has_no_modifiers() => {
-                self.handle_delete_key();
-                true
-            }
-            BareKey::Char(c) if key.has_no_modifiers() && c != '\n' => {
-                let items = self.combined_items(); // Always use full item list, not search results
-                self.search_engine.add_char(c, &items);
-                true
-            }
-            BareKey::Backspace if key.has_no_modifiers() => {
-                let items = self.combined_items(); // Always use full item list, not search results
-                self.search_engine.backspace(&items);
-                true
-            }
-            BareKey::Esc if key.has_no_modifiers() => {
-                if self.search_engine.is_searching() {
-                    self.search_engine.clear();
+        // Look up the action for this key
+        if let Some(action) = self.config.keybinds.get_action(&key) {
+            match action {
+                KeyAction::MoveUp => {
+                    self.move_selection_up();
                     true
-                } else {
+                }
+                KeyAction::MoveDown => {
+                    self.move_selection_down();
+                    true
+                }
+                KeyAction::Select => {
+                    self.handle_item_selection();
+                    true
+                }
+                KeyAction::DeleteSession => {
+                    self.handle_delete_key();
+                    true
+                }
+                KeyAction::Exit => {
                     hide_self();
                     false
                 }
+                KeyAction::ClearSearch => {
+                    if self.search_engine.is_searching() {
+                        self.search_engine.clear();
+                        true
+                    } else {
+                        hide_self();
+                        false
+                    }
+                }
+                KeyAction::Backspace => {
+                    let items = self.combined_items(); // Always use full item list, not search results
+                    self.search_engine.backspace(&items);
+                    true
+                }
+                KeyAction::CharacterInput(c) => {
+                    let items = self.combined_items(); // Always use full item list, not search results
+                    self.search_engine.add_char(c, &items);
+                    true
+                }
+                // Other actions are not handled on the main screen
+                _ => false,
             }
-            BareKey::Char('c') if key.has_modifiers(&[KeyModifier::Ctrl]) => {
-                hide_self();
-                false
-            }
-            _ => false,
+        } else {
+            false
         }
     }
 
     /// Handle new session screen key input
     fn handle_new_session_key(&mut self, key: KeyWithModifier) -> bool {
-        match key.bare_key {
-            BareKey::Enter if key.has_no_modifiers() => {
-                // Handle session creation
-                self.new_session_info.handle_selection(&self.current_session_name);
-                self.active_screen = ActiveScreen::Main;
-                true
-            }
-            BareKey::Esc if key.has_no_modifiers() => {
-                // Special handling for Esc when entering session name - go back to main
-                if self.new_session_info.entering_new_session_name() && self.new_session_info.name().is_empty() {
+        // Look up the action for this key
+        if let Some(action) = self.config.keybinds.get_action(&key) {
+            match action {
+                KeyAction::Confirm => {
+                    // Handle session creation
+                    self.new_session_info.handle_selection(&self.current_session_name);
                     self.active_screen = ActiveScreen::Main;
-                } else {
-                    // Let NewSessionInfo handle its own escape logic
-                    self.new_session_info.handle_key(key);
+                    true
                 }
-                true
+                KeyAction::Cancel => {
+                    // Special handling for Esc when entering session name - go back to main
+                    if self.new_session_info.entering_new_session_name() && self.new_session_info.name().is_empty() {
+                        self.active_screen = ActiveScreen::Main;
+                    } else {
+                        // Let NewSessionInfo handle its own escape logic
+                        self.new_session_info.handle_key(key, &self.config.keybinds);
+                    }
+                    true
+                }
+                KeyAction::LaunchFilepicker => {
+                    // Handle filepicker
+                    self.launch_filepicker();
+                    true
+                }
+                KeyAction::ClearFolder => {
+                    // Clear session folder - don't delegate to NewSessionInfo
+                    self.new_session_info.set_folder(None);
+                    true
+                }
+                _ => {
+                    // Delegate other keys to NewSessionInfo component
+                    self.new_session_info.handle_key(key, &self.config.keybinds);
+                    true
+                }
             }
-            BareKey::Char('f') if key.has_modifiers(&[KeyModifier::Ctrl]) => {
-                // Handle filepicker
-                self.launch_filepicker();
-                true
-            }
-            BareKey::Char('c') if key.has_modifiers(&[KeyModifier::Ctrl]) => {
-                // Clear session folder - don't delegate to NewSessionInfo
-                self.new_session_info.set_folder(None);
-                true
-            }
-            _ => {
-                // Delegate other keys to NewSessionInfo component
-                self.new_session_info.handle_key(key);
-                true
-            }
+        } else {
+            // Delegate other keys to NewSessionInfo component
+            self.new_session_info.handle_key(key, &self.config.keybinds);
+            true
         }
     }
 
     /// Handle deletion confirmation
     fn handle_deletion_confirmation(&mut self, key: KeyWithModifier, _session_name: &str) -> bool {
         match key.bare_key {
-            BareKey::Char('y') | BareKey::Char('Y') if key.has_no_modifiers() => {
+            BareKey::Char('y') | BareKey::Char('Y') if key.key_modifiers.is_empty() => {
                 self.session_manager.confirm_deletion();
                 true
             }
-            BareKey::Char('n') | BareKey::Char('N') | BareKey::Esc if key.has_no_modifiers() => {
+            BareKey::Char('n') | BareKey::Char('N') | BareKey::Esc if key.key_modifiers.is_empty() => {
                 self.session_manager.cancel_deletion();
                 true
             }

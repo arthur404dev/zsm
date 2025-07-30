@@ -1,4 +1,5 @@
 mod config;
+mod keybinds;
 mod new_session_info;
 mod session;
 mod state;
